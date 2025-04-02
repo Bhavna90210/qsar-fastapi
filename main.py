@@ -1,42 +1,42 @@
-from fastapi import FastAPI
-import gdown
-import pickle
+import requests
+import joblib
 import os
-import uvicorn
+from fastapi import FastAPI
+import numpy as np
 
-# Initialize FastAPI
 app = FastAPI()
 
-# Google Drive File ID & Model Path
-FILE_ID = "1j_wZqYeOC4yrGn0RklbTc4wOZN-3kvaV"
+# Google Drive File ID
+GDRIVE_FILE_ID = "1j_wZqYeOC4yrGn0RklbTc4wOZN-3kvaV"
 MODEL_PATH = "qsar_model.pkl"
 
-# Function to download model if not exists
 def download_model():
+    """Downloads model from Google Drive if not present."""
     if not os.path.exists(MODEL_PATH):
-        print("Downloading model from Google Drive...")
-        url = f"https://drive.google.com/uc?id={FILE_ID}"
-        gdown.download(url, MODEL_PATH, quiet=False)
+        print("Downloading QSAR model...")
+        url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
+        response = requests.get(url)
+        with open(MODEL_PATH, "wb") as f:
+            f.write(response.content)
+        print("Download complete.")
 
-# Load the model
-def load_model():
-    download_model()
-    with open(MODEL_PATH, "rb") as file:
-        return pickle.load(file)
+# Download model at startup
+download_model()
 
-# Load QSAR Model
-model = load_model()
+# Load model
+model = joblib.load(MODEL_PATH)
 
-# API Endpoint for Prediction
+@app.get("/")
+def read_root():
+    return {"message": "QSAR API is running"}
+
 @app.post("/predict/")
-def predict(data: dict):
+def predict(features: list):
+    """Takes a list of features and returns the predicted pIC50 value."""
     try:
-        features = data["features"]  # Expecting list of features
-        prediction = model.predict([features])
-        return {"prediction": float(prediction[0])}
+        input_data = np.array(features).reshape(1, -1)
+        prediction = model.predict(input_data)[0]
+        return {"pIC50": prediction}
     except Exception as e:
         return {"error": str(e)}
 
-# Run the API (Only for local testing, Render will handle this automatically)
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)

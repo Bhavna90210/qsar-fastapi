@@ -4,3 +4,5 @@ scikit-learn
 pandas
 pickle-mixin
 gdown
+joblib
+requests
